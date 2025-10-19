@@ -1,3 +1,4 @@
+// controllers/auth.controller.js
 const User = require('../models/User.model');
 const { sendTokenResponse } = require('../utils/generateToken');
 const crypto = require('crypto');

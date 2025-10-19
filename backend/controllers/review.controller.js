@@ -1,6 +1,11 @@
+// controllers/review.controller.js
 const Review = require('../models/Review.model');
+const Product = require('../models/Product.model');
+const ApiResponse = require('../utils/ApiResponse');
 
-// Get product reviews
+// @desc    Get product reviews
+// @route   GET /api/reviews/product/:productId
+// @access  Public
 exports.getProductReviews = async (req, res, next) => {
   try {
     const reviews = await Review.find({ product: req.params.productId })
@@ -13,7 +18,9 @@ exports.getProductReviews = async (req, res, next) => {
   }
 };
 
-// Create review
+// @desc    Create review
+// @route   POST /api/reviews
+// @access  Private
 exports.createReview = async (req, res, next) => {
   try {
     const { productId, rating, comment } = req.body;
@@ -53,7 +60,9 @@ exports.createReview = async (req, res, next) => {
   }
 };
 
-// Update review
+// @desc    Update review
+// @route   PUT /api/reviews/:id
+// @access  Private
 exports.updateReview = async (req, res, next) => {
   try {
     const { rating, comment } = req.body;
@@ -80,7 +89,9 @@ exports.updateReview = async (req, res, next) => {
   }
 };
 
-// Delete review
+// @desc    Delete review
+// @route   DELETE /api/reviews/:id
+// @access  Private
 exports.deleteReview = async (req, res, next) => {
   try {
     const review = await Review.findById(req.params.id);
@@ -89,4 +100,14 @@ exports.deleteReview = async (req, res, next) => {
     }
 
     // Check if user owns the review
-    if (review.user.toString() !== req.user._id.toString
+    if (review.user.toString() !== req.user._id.toString()) {
+      return ApiResponse.error(res, 'Not authorized', 403);
+    }
+
+    await review.remove();
+
+    ApiResponse.success(res, {}, 'Review deleted');
+  } catch (error) {
+    next(error);
+  }
+};

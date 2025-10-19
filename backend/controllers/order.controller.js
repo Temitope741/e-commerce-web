@@ -1,6 +1,12 @@
+// controllers/order.controller.js
 const Order = require('../models/Order.model');
+const Product = require('../models/Product.model');
+const Cart = require('../models/Cart.model');
+const ApiResponse = require('../utils/ApiResponse');
 
-// Create order
+// @desc    Create new order
+// @route   POST /api/orders
+// @access  Private
 exports.createOrder = async (req, res, next) => {
   try {
     const { items, shippingAddress, paymentMethod } = req.body;
@@ -78,7 +84,9 @@ exports.createOrder = async (req, res, next) => {
   }
 };
 
-// Get user orders
+// @desc    Get user orders
+// @route   GET /api/orders
+// @access  Private
 exports.getMyOrders = async (req, res, next) => {
   try {
     const orders = await Order.find({ customer: req.user._id })
@@ -92,7 +100,9 @@ exports.getMyOrders = async (req, res, next) => {
   }
 };
 
-// Get single order
+// @desc    Get single order
+// @route   GET /api/orders/:id
+// @access  Private
 exports.getOrder = async (req, res, next) => {
   try {
     const order = await Order.findById(req.params.id)
@@ -119,7 +129,9 @@ exports.getOrder = async (req, res, next) => {
   }
 };
 
-// Update order status (Vendor only)
+// @desc    Update order status
+// @route   PUT /api/orders/:id/status
+// @access  Private (Vendor only)
 exports.updateOrderStatus = async (req, res, next) => {
   try {
     const { status } = req.body;

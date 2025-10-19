@@ -1,4 +1,11 @@
-// Get vendor dashboard stats
+// controllers/vendor.controller.js
+const Product = require('../models/Product.model');
+const Order = require('../models/Order.model');
+const ApiResponse = require('../utils/ApiResponse');
+
+// @desc    Get vendor dashboard stats
+// @route   GET /api/vendor/dashboard
+// @access  Private (Vendor only)
 exports.getDashboardStats = async (req, res, next) => {
   try {
     // Total products
@@ -66,7 +73,9 @@ exports.getDashboardStats = async (req, res, next) => {
   }
 };
 
-// Get vendor products
+// @desc    Get vendor products
+// @route   GET /api/vendor/products
+// @access  Private (Vendor only)
 exports.getVendorProducts = async (req, res, next) => {
   try {
     const { page = 1, limit = 10 } = req.query;
@@ -86,7 +95,9 @@ exports.getVendorProducts = async (req, res, next) => {
   }
 };
 
-// Get vendor orders
+// @desc    Get vendor orders
+// @route   GET /api/vendor/orders
+// @access  Private (Vendor only)
 exports.getVendorOrders = async (req, res, next) => {
   try {
     const { page = 1, limit = 10, status } = req.query;
@@ -110,29 +121,4 @@ exports.getVendorOrders = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-};()) {
-      return ApiResponse.error(res, 'Not authorized', 403);
-    }
-
-    review = await Review.findByIdAndUpdate(
-      req.params.id,
-      { rating, comment },
-      { new: true, runValidators: true }
-    ).populate('user', 'fullName avatarUrl');
-
-    ApiResponse.success(res, review, 'Review updated');
-  } catch (error) {
-    next(error);
-  }
 };
-
-// Delete review
-exports.deleteReview = async (req, res, next) => {
-  try {
-    const review = await Review.findById(req.params.id);
-    if (!review) {
-      return ApiResponse.error(res, 'Review not found', 404);
-    }
-
-    // Check if user owns the review
-    if (review.user.toString() !== req.user._id.toString

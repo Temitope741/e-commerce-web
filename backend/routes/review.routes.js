@@ -1,3 +1,4 @@
+// routes/review.routes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -6,7 +7,7 @@ const {
   updateReview,
   deleteReview
 } = require('../controllers/review.controller');
-const { protect, optionalAuth } = require('../middleware/auth.middleware');
+const { protect } = require('../middleware/auth.middleware');
 
 // Public route
 router.get('/product/:productId', getProductReviews);

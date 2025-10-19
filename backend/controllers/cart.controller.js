@@ -125,7 +125,7 @@ exports.removeFromCart = async (req, res, next) => {
   }
 };
 
-// Clear cart
+// At the end of cart.controller.js - verify this function exists
 exports.clearCart = async (req, res, next) => {
   try {
     const cart = await Cart.findOne({ user: req.user._id });

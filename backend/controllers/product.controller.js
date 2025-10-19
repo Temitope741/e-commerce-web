@@ -1,67 +1,59 @@
+// controllers/product.controller.js
 const Product = require('../models/Product.model');
-const ApiResponse = require('../utils/ApiResponse');
 
-// @desc    Get all products with filters & pagination
+// @desc    Get all products with filters, search, and pagination
 // @route   GET /api/products
 // @access  Public
-exports.getProducts = async (req, res, next) => {
+exports.getAllProducts = async (req, res, next) => {
   try {
-    const {
-      page = 1,
-      limit = 12,
-      category,
-      search,
-      minPrice,
-      maxPrice,
-      sortBy = 'createdAt',
-      order = 'desc',
-      vendor
-    } = req.query;
+    const { page = 1, limit = 10, search, category, minPrice, maxPrice, rating } = req.query;
 
-    // Build query
-    const query = { isActive: true };
+    let filter = {};
 
-    // Filter by category
-    if (category) {
-      query.category = category;
-    }
-
-    // Filter by vendor
-    if (vendor) {
-      query.vendor = vendor;
-    }
-
-    // Search in name and description
+    // Search filter
     if (search) {
-      query.$text = { $search: search };
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Category filter
+    if (category) {
+      filter.category = category;
     }
 
     // Price range filter
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = Number(minPrice);
-      if (maxPrice) query.price.$lte = Number(maxPrice);
+      filter.price = {};
+      if (minPrice) filter.price.$gte = Number(minPrice);
+      if (maxPrice) filter.price.$lte = Number(maxPrice);
     }
 
-    // Calculate pagination
-    const skip = (page - 1) * limit;
+    // Rating filter
+    if (rating) {
+      filter.averageRating = { $gte: Number(rating) };
+    }
 
-    // Get total count
-    const total = await Product.countDocuments(query);
+    const skip = (Number(page) - 1) * Number(limit);
 
-    // Sort options
-    const sortOptions = {};
-    sortOptions[sortBy] = order === 'asc' ? 1 : -1;
-
-    // Execute query
-    const products = await Product.find(query)
+    const products = await Product.find(filter)
+      .populate('category', 'name')
       .populate('vendor', 'fullName email')
-      .populate('category', 'name slug')
-      .sort(sortOptions)
       .skip(skip)
-      .limit(Number(limit));
+      .limit(Number(limit))
+      .sort({ createdAt: -1 });
 
-    ApiResponse.paginated(res, products, Number(page), Number(limit), total);
+    const totalProducts = await Product.countDocuments(filter);
+
+    res.status(200).json({
+      success: true,
+      count: products.length,
+      total: totalProducts,
+      pages: Math.ceil(totalProducts / Number(limit)),
+      currentPage: Number(page),
+      data: products
+    });
   } catch (error) {
     next(error);
   }
@@ -70,28 +62,24 @@ exports.getProducts = async (req, res, next) => {
 // @desc    Get single product by ID
 // @route   GET /api/products/:id
 // @access  Public
-exports.getProduct = async (req, res, next) => {
+exports.getProductById = async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id)
+      .populate('category', 'name')
       .populate('vendor', 'fullName email phone')
-      .populate('category', 'name slug description')
-      .populate({
-        path: 'reviews',
-        populate: {
-          path: 'user',
-          select: 'fullName avatarUrl'
-        }
-      });
+      .populate('reviews');
 
     if (!product) {
-      return ApiResponse.error(res, 'Product not found', 404);
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
     }
 
-    // Increment view count
-    product.viewCount += 1;
-    await product.save();
-
-    ApiResponse.success(res, product);
+    res.status(200).json({
+      success: true,
+      data: product
+    });
   } catch (error) {
     next(error);
   }
@@ -102,40 +90,42 @@ exports.getProduct = async (req, res, next) => {
 // @access  Private (Vendor only)
 exports.createProduct = async (req, res, next) => {
   try {
-    const {
+    const { name, description, price, stockQuantity, category, imageUrl, images, sku } = req.body;
+
+    // Validate required fields
+    if (!name || !price || !category || stockQuantity === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields: name, price, category, stockQuantity'
+      });
+    }
+
+    // Check if product already exists
+    const existingProduct = await Product.findOne({ name, vendor: req.user.id });
+    if (existingProduct) {
+      return res.status(400).json({
+        success: false,
+        message: 'Product with this name already exists for this vendor'
+      });
+    }
+
+    const product = await Product.create({
       name,
       description,
-      price,
-      stockQuantity,
+      price: Number(price),
+      stockQuantity: Number(stockQuantity),
       category,
       imageUrl,
       images,
-      sku
-    } = req.body;
-
-    // Validate required fields
-    if (!name || !price || !category) {
-      return ApiResponse.error(res, 'Please provide name, price, and category', 400);
-    }
-
-    // Create product with vendor ID from authenticated user
-    const product = await Product.create({
-      vendor: req.user._id,
-      name,
-      description,
-      price,
-      stockQuantity: stockQuantity || 0,
-      category,
-      imageUrl,
-      images: images || [],
-      sku
+      sku,
+      vendor: req.user.id
     });
 
-    const populatedProduct = await Product.findById(product._id)
-      .populate('vendor', 'fullName email')
-      .populate('category', 'name slug');
-
-    ApiResponse.success(res, populatedProduct, 'Product created successfully', 201);
+    res.status(201).json({
+      success: true,
+      message: 'Product created successfully',
+      data: product
+    });
   } catch (error) {
     next(error);
   }
@@ -143,33 +133,46 @@ exports.createProduct = async (req, res, next) => {
 
 // @desc    Update product
 // @route   PUT /api/products/:id
-// @access  Private (Vendor - own products only)
+// @access  Private (Vendor owner only)
 exports.updateProduct = async (req, res, next) => {
   try {
     let product = await Product.findById(req.params.id);
 
     if (!product) {
-      return ApiResponse.error(res, 'Product not found', 404);
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
     }
 
-    // Check if user is the product owner
-    if (product.vendor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-      return ApiResponse.error(res, 'Not authorized to update this product', 403);
+    // Check if user is the vendor owner
+    if (product.vendor.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this product'
+      });
     }
 
-    // Update product
-    product = await Product.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true
+    // Update allowed fields
+    const allowedUpdates = ['name', 'description', 'price', 'stock', 'image', 'specifications', 'isActive'];
+    const updates = {};
+
+    allowedUpdates.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
       }
-    )
-      .populate('vendor', 'fullName email')
-      .populate('category', 'name slug');
+    });
 
-    ApiResponse.success(res, product, 'Product updated successfully');
+    product = await Product.findByIdAndUpdate(req.params.id, updates, {
+      new: true,
+      runValidators: true
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Product updated successfully',
+      data: product
+    });
   } catch (error) {
     next(error);
   }
@@ -177,47 +180,84 @@ exports.updateProduct = async (req, res, next) => {
 
 // @desc    Delete product
 // @route   DELETE /api/products/:id
-// @access  Private (Vendor - own products only)
+// @access  Private (Vendor owner or Admin)
 exports.deleteProduct = async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id);
 
     if (!product) {
-      return ApiResponse.error(res, 'Product not found', 404);
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
     }
 
-    // Check if user is the product owner
-    if (product.vendor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-      return ApiResponse.error(res, 'Not authorized to delete this product', 403);
+    // Check authorization
+    if (product.vendor.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete this product'
+      });
     }
 
-    // Soft delete - set isActive to false
-    product.isActive = false;
-    await product.save();
+    await Product.findByIdAndDelete(req.params.id);
 
-    // Or hard delete if preferred:
-    // await product.remove();
-
-    ApiResponse.success(res, {}, 'Product deleted successfully');
+    res.status(200).json({
+      success: true,
+      message: 'Product deleted successfully',
+      data: {}
+    });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Get featured/trending products
-// @route   GET /api/products/featured
+// @desc    Get products by category
+// @route   GET /api/products/category/:categoryId
 // @access  Public
-exports.getFeaturedProducts = async (req, res, next) => {
+exports.getProductsByCategory = async (req, res, next) => {
   try {
-    const limit = Number(req.query.limit) || 8;
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const products = await Product.find({ category: req.params.categoryId, isActive: true })
+      .populate('category', 'name')
+      .populate('vendor', 'fullName')
+      .skip(skip)
+      .limit(Number(limit));
+
+    const total = await Product.countDocuments({ category: req.params.categoryId, isActive: true });
+
+    res.status(200).json({
+      success: true,
+      count: products.length,
+      total,
+      pages: Math.ceil(total / Number(limit)),
+      data: products
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get top rated products
+// @route   GET /api/products/top-rated
+// @access  Public
+exports.getTopRatedProducts = async (req, res, next) => {
+  try {
+    const limit = req.query.limit || 10;
 
     const products = await Product.find({ isActive: true })
-      .sort({ averageRating: -1, soldCount: -1 })
-      .limit(limit)
+      .populate('category', 'name')
       .populate('vendor', 'fullName')
-      .populate('category', 'name slug');
+      .sort({ averageRating: -1 })
+      .limit(Number(limit));
 
-    ApiResponse.success(res, products);
+    res.status(200).json({
+      success: true,
+      count: products.length,
+      data: products
+    });
   } catch (error) {
     next(error);
   }

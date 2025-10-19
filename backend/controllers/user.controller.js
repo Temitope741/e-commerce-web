@@ -1,4 +1,7 @@
-// Get user profile
+// controllers/user.controller.js
+const User = require('../models/User.model');
+const ApiResponse = require('../utils/ApiResponse');
+
 exports.getProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
@@ -13,7 +16,6 @@ exports.getProfile = async (req, res, next) => {
   }
 };
 
-// Update user profile
 exports.updateProfile = async (req, res, next) => {
   try {
     const { fullName, phone, address, avatarUrl } = req.body;
@@ -30,7 +32,6 @@ exports.updateProfile = async (req, res, next) => {
   }
 };
 
-// Delete user account
 exports.deleteAccount = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
@@ -39,7 +40,6 @@ exports.deleteAccount = async (req, res, next) => {
       return ApiResponse.error(res, 'User not found', 404);
     }
 
-    // Soft delete
     user.isActive = false;
     await user.save();
 

@@ -1,6 +1,7 @@
+// controllers/category.controller.js
 const Category = require('../models/Category.model');
+const ApiResponse = require('../utils/ApiResponse');
 
-// Get all categories
 exports.getCategories = async (req, res, next) => {
   try {
     const categories = await Category.find({ isActive: true })
@@ -12,7 +13,6 @@ exports.getCategories = async (req, res, next) => {
   }
 };
 
-// Get single category
 exports.getCategory = async (req, res, next) => {
   try {
     const category = await Category.findById(req.params.id);
@@ -27,7 +27,6 @@ exports.getCategory = async (req, res, next) => {
   }
 };
 
-// Create category (Admin only)
 exports.createCategory = async (req, res, next) => {
   try {
     const { name, description, slug, imageUrl } = req.body;
@@ -49,7 +48,6 @@ exports.createCategory = async (req, res, next) => {
   }
 };
 
-// Update category (Admin only)
 exports.updateCategory = async (req, res, next) => {
   try {
     let category = await Category.findById(req.params.id);
@@ -70,7 +68,6 @@ exports.updateCategory = async (req, res, next) => {
   }
 };
 
-// Delete category (Admin only)
 exports.deleteCategory = async (req, res, next) => {
   try {
     const category = await Category.findById(req.params.id);
@@ -79,7 +76,6 @@ exports.deleteCategory = async (req, res, next) => {
       return ApiResponse.error(res, 'Category not found', 404);
     }
 
-    // Soft delete
     category.isActive = false;
     await category.save();
 

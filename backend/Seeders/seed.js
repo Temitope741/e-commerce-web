@@ -8,11 +8,7 @@ const Product = require('../models/Product.model');
 dotenv.config();
 
 // Connect to database
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
-
+mongoose.connect(process.env.MONGODB_URI);
 // Sample categories
 const categories = [
   {
